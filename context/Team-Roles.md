@@ -15,7 +15,7 @@ Links back to [[Home]].
 
 ### You — Game Design + Development
 - **Design leadership**: Core mechanics, progression tuning, balance, roguelike run structure
-- **Code**: All GDScript implementation (main.gd, player.gd, idle loop, save/load, roguelike state machine)
+- **Code**: All Dart/Flutter + Flame implementation (main.dart, managers, idle loop, SQLite save/load, roguelike state machine, Flame scenes)
 - **Build/export**: Handle Android/iOS builds, packaging, release pipeline
 - **AI engineering**: Post-MVP — if live events or procedural generation needed, your domain
 

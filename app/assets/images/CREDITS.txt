@@ -1,0 +1,4 @@
+knight.png — "PixelKnight" by BastianSe
+Source: https://opengameart.org/content/pixelknight
+License: CC0 1.0 (public domain) — no attribution required; credited voluntarily.
+Sheet layout: 48x48 frames, 4 columns x 7 rows. Row 0 = idle, row 1 = attack.

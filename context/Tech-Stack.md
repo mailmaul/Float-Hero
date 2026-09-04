@@ -13,25 +13,30 @@ Core feature request: game shows as a **floating overlay bubble** (like Messenge
 
 ## Primary: Flutter + Flame
 
-**Decision: Switch primary to Flutter — floating bubble requirement outweighs the 17% Godot perf edge.**
+**Decision: Flutter for the app shell + UI, Flame for gameplay rendering.** (Switched from Godot.)
 
-### Why Flutter wins for THIS project
-- **Ready-made plugins**: `floating_bubble_overlay`, `system_alert_window`, `flutter_floatwing` — all production-grade, all built specifically for Messenger-style chat heads. Drop-in, documented, maintained.
-- **Godot has nothing built-in for this.** You'd write a custom native Android plugin in Java/Kotlin from scratch (WindowManager + SYSTEM_ALERT_WINDOW), then bridge it through Godot's Android plugin system — that's Android native dev, not game dev, and there's no existing example to fork.
-- **You already know Dart** — the floating bubble plugin API is just another Flutter package, zero new language to learn on top of the overlay work.
-- **Hot reload** still helps iterate on the bubble UI (size, drag behavior, tap-to-expand) fast.
+Two independent reasons — do NOT conflate them:
 
-### Tradeoff accepted
-- ~5-10% slower on object-heavy scenes vs Godot (irrelevant for idle clicker — low object count).
-- Larger APK (80-120MB vs Godot's ~40MB) — acceptable for this scope.
-- Full tradeoff writeup already in chat history — nothing here overrides pure game-loop performance, only the bubble feature does.
+### Reason 1 — Gameplay rendering → Flame
+- Flame gives the game loop (`update(dt)`/`render`), `SpriteSheet`/`SpriteAnimationComponent`, particles, camera/parallax, and collisions. The side-view pixel scenes (home + roguelike runs) live here.
+- **Status: in use.** Home screen is a Flame `FlameGame` (side-view, hero vs rival, CC0 sprite sheet). `flame` 1.38.2 in `pubspec.yaml`.
 
-### Setup
+### Reason 2 — Floating bubble overlay → native Android, NOT an engine choice
+- The Messenger-style chat-head is a **platform capability** (`SYSTEM_ALERT_WINDOW` + foreground service), unrelated to whether the game renders in Flame or plain Flutter. Flutter just has ready-made overlay plugins (`floating_bubble_overlay`, `flutter_floatwing`); Godot would need a custom native Android plugin. That plugin availability — not Flame — is the Flutter win for the bubble.
+
+### Why Flutter over Godot (recap)
+- You already know Dart; hot reload; ready-made overlay plugins for the bubble; Flame covers the 2D game-loop needs. Accepted tradeoff: ~5–10% slower on object-heavy scenes and a larger APK — irrelevant for a low-object idle clicker.
+
+### Setup (actual)
 ```
-Framework: Flutter 3.x + Flame (game loop, sprites, animation)
-Overlay: floating_bubble_overlay or flutter_floatwing
-Target: Android 9+ (API 28+) ONLY for MVP — iOS deferred entirely, no in-app-only fallback build for v1
-Permissions: SYSTEM_ALERT_WINDOW, FOREGROUND_SERVICE, POST_NOTIFICATIONS
+Framework: Flutter 3.44.8 (Dart SDK ^3.8.1) + Flame 1.38.2
+Persistence: sqflite (SQLite) + path   [NOT shared_preferences]
+Rendering: Flame FlameGame for scenes; Flutter widgets for HUD/shop/menus
+Sprites: CC0 "PixelKnight" (OpenGameArt), assets/images/knight.png, 48x48 sheet
+Audio: flame_audio 2.12.2 — 8-bit chiptune SFX in assets/audio/ (procedurally generated, ~59KB)
+Target: Android 9+ (API 28+) ONLY for MVP — iOS deferred entirely
+Not yet added: floating bubble / overlay plugins, home_widget
+Permissions (future, for bubble): SYSTEM_ALERT_WINDOW, FOREGROUND_SERVICE, POST_NOTIFICATIONS
 ```
 
 ### Fallback: Godot 4.x

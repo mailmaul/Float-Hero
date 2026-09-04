@@ -88,5 +88,11 @@ void main() {
 
       m.dispose();
     });
+
+    test('rewardFor keeps full gold on victory, half (floored) on defeat', () {
+      expect(RunManager.rewardFor(100, true), 100);
+      expect(RunManager.rewardFor(101, false), 50);
+      expect(RunManager.rewardFor(0, false), 0);
+    });
   });
 }

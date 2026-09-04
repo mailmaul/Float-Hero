@@ -146,6 +146,11 @@ class RunManager extends ChangeNotifier {
     };
   }
 
+  /// Gold actually kept when returning to the idle world: full on victory,
+  /// half (rounded down) on defeat — the roguelike risk/reward trade.
+  static double rewardFor(double goldEarned, bool victory) =>
+      victory ? goldEarned : (goldEarned * 0.5).floorToDouble();
+
   @override
   void dispose() {
     _combatTimer?.cancel();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../game_state/managers/economy_manager.dart';
 import '../../game_state/models/game_hero.dart';
 import '../../game_state/models/upgrade.dart';
+import '../../audio/sfx.dart';
 
 class ShopScreen extends StatelessWidget {
   final EconomyManager economyManager;
@@ -156,6 +157,7 @@ class ShopScreen extends StatelessWidget {
                     onPressed: isAffordable
                         ? () {
                             economyManager.purchaseHero(hero.id);
+                            Sfx.buy();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Purchased ${hero.name}!'),
@@ -247,6 +249,7 @@ class ShopScreen extends StatelessWidget {
                   onPressed: isAffordable
                       ? () {
                           economyManager.purchaseUpgrade(upgrade.id);
+                          Sfx.buy();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(

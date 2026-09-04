@@ -1,5 +1,8 @@
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import '../../game/run_game.dart';
 import '../../game_state/managers/run_manager.dart';
+import '../../audio/sfx.dart';
 
 class RunScreen extends StatefulWidget {
   final RunManager runManager;
@@ -17,7 +20,11 @@ class RunScreen extends StatefulWidget {
 
 class _RunScreenState extends State<RunScreen> {
   RunManager get runManager => widget.runManager;
+  late final RunGame _game = RunGame(runManager);
   bool _ended = false;
+
+  static const Color _bg = Color(0xFF20323A);
+  static const Color _ink = Color(0xFF3A2A1A);
 
   @override
   void initState() {
@@ -34,10 +41,18 @@ class _RunScreenState extends State<RunScreen> {
   void _onChanged() {
     if (_ended || runManager.isRunActive) return;
     _ended = true;
+    (runManager.runState?.victory ?? false) ? Sfx.win() : Sfx.lose();
     // Brief pause so the player sees the final state before returning.
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) widget.onRunEnd();
     });
+  }
+
+  void _attack() {
+    if (!runManager.isRunActive) return;
+    runManager.heroAttack();
+    _game.playHeroAttack();
+    Sfx.hit();
   }
 
   @override
@@ -48,16 +63,18 @@ class _RunScreenState extends State<RunScreen> {
         final run = runManager.runState;
         if (run == null) {
           return const Scaffold(
-            backgroundColor: Color(0xFF1a1a2e),
-            body: Center(child: Text('No run data')),
+            backgroundColor: _bg,
+            body: Center(
+              child: Text('No run data', style: TextStyle(color: Colors.white)),
+            ),
           );
         }
 
-        final heroHealthPercent =
+        final hpPct =
             (run.heroHealth / run.heroMaxHealth).clamp(0.0, 1.0).toDouble();
 
         return Scaffold(
-          backgroundColor: const Color(0xFF1a1a2e),
+          backgroundColor: _bg,
           appBar: AppBar(
             title: const Text('ROGUELIKE RUN'),
             backgroundColor: const Color(0xFF16213e),
@@ -68,7 +85,7 @@ class _RunScreenState extends State<RunScreen> {
             children: [
               // Hero status.
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -80,31 +97,23 @@ class _RunScreenState extends State<RunScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
-                          child: Container(
-                            height: 20,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.red, width: 1),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(3),
-                              child: LinearProgressIndicator(
-                                value: heroHealthPercent,
-                                backgroundColor: Colors.red[900],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  heroHealthPercent > 0.5
-                                      ? Colors.greenAccent
-                                      : Colors.orange,
-                                ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: hpPct,
+                              minHeight: 16,
+                              backgroundColor: Colors.red[900],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                hpPct > 0.5 ? Colors.greenAccent : Colors.orange,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Text(
                           '${run.heroHealth.toStringAsFixed(0)}/${run.heroMaxHealth.toStringAsFixed(0)}',
                           style: const TextStyle(
@@ -118,92 +127,58 @@ class _RunScreenState extends State<RunScreen> {
                 ),
               ),
 
-              // Wave info and stats.
+              // Stats row.
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _stat('WAVE', '${run.waveNumber}', Colors.cyan),
-                    _stat('GOLD', run.goldEarned.toStringAsFixed(0),
-                        Colors.yellow),
+                    _stat('GOLD', run.goldEarned.toStringAsFixed(0), Colors.yellow),
                     _stat('XP', run.xpEarned.toString(), Colors.greenAccent),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
-              // Enemies display.
+              // Flame battle scene (tap to attack).
               Expanded(
-                child: ListView.builder(
-                  itemCount: run.enemies.length,
-                  itemBuilder: (context, index) {
-                    final enemy = run.enemies[index];
-                    final enemyHealthPercent =
-                        (enemy.health / enemy.maxHealth).clamp(0.0, 1.0).toDouble();
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            enemy.name,
-                            style: const TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 16,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(3),
-                              border: Border.all(color: Colors.red, width: 1),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: enemyHealthPercent,
-                                backgroundColor: Colors.red[900],
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Colors.red,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(border: Border.all(color: _ink, width: 3)),
+                  child: ClipRect(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _attack,
+                      child: GameWidget(game: _game),
+                    ),
+                  ),
                 ),
               ),
 
               // Attack button.
               Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: ElevatedButton(
-                  onPressed: runManager.heroAttack,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 60,
-                      vertical: 18,
+                padding: const EdgeInsets.all(16),
+                child: GestureDetector(
+                  onTap: _attack,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE05B5B),
+                      border: Border.all(color: _ink, width: 3),
+                      boxShadow: const [BoxShadow(color: _ink, offset: Offset(0, 5))],
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'ATTACK!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    child: const Text(
+                      'ATTACK!',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -218,10 +193,7 @@ class _RunScreenState extends State<RunScreen> {
   Widget _stat(String label, String value, Color color) {
     return Column(
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Colors.grey, fontSize: 12),
-        ),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         Text(
           value,
           style: TextStyle(
