@@ -18,6 +18,7 @@ Central hub (MOC) for all design context. Every note below links back here — k
 ## Development Roadmap
 - [[MVP-Scope]] — Week-by-week breakdown, success criteria
 - [[Event-Roadmap]] — Post-MVP launch options (Ludum Dare, app store, local showcase)
+- [[HomeScreen-Widget-Plan]] — Android home-screen App Widget (WhatsApp-style) showing the hero fighting; feasibility + phased plan
 
 ---
 
@@ -47,4 +48,5 @@ Central hub (MOC) for all design context. Every note below links back here — k
 - **2026-09-04 — Concept Locked** — Core fantasy defined as TBH-like idle/roguelike, Godot 4.4 chosen initially, team roles assigned, MVP scope set for 4 weeks.
 - **2026-09-04 — Engine Revised** — Floating bubble overlay (Messenger chat-head style) is a core requirement → switched primary engine to **Flutter + Flame** (ready-made overlay plugins exist; Godot has none built-in). iOS confirmed incompatible with floating overlays at the OS level (Android-only feature). See [[Tech-Stack]] and [[Open-Questions]].
 - **2026-09-04 — Platform Scope Locked** — MVP is **Android-only**. iOS deferred entirely post-MVP. Removes ambiguity from [[Tech-Stack]] target line.
+- **2026-09-04 — Home Widget Planned** — Drafted [[HomeScreen-Widget-Plan]]: standard Android App Widget via `home_widget` + native RemoteViews. Feasible but **not a live Flame render** (looped sprites + throttled snapshots + native HP/gold views). Overlaps the [[Tech-Stack]] floating bubble (the truly-live surface) — role decision needed before build.
 - **2026-09-04 — Project Scaffolded** — `Game/float-hero/app/` created (`flutter create`, Android-only). Deps added: `flame`, `flame_audio`, `floating_bubble_overlay`, `shared_preferences`. `flutter analyze` clean, 0 issues. **Blocker**: Android SDK not installed on this machine — `flutter doctor` shows Android toolchain missing, needed before `flutter run`/APK build. Flutter SDK itself present at `~/flutter` (3.44.8).

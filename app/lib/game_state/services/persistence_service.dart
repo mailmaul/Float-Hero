@@ -2,59 +2,53 @@ import 'dart:async';
 import '../models/game_save.dart';
 import '../../data/database/db_helper.dart';
 
+/// Persists the game to the local database. The live game state is supplied
+/// via a provider callback so every save writes the current progress rather
+/// than a stale snapshot.
 class PersistenceService {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  PersistenceService({DatabaseHelper? dbHelper})
+      : _dbHelper = dbHelper ?? DatabaseHelper();
+
+  final DatabaseHelper _dbHelper;
   Timer? _autoSaveTimer;
-  GameSave? _currentSave;
-  static const int _autoSaveIntervalSeconds = 5;
+  GameSave Function()? _stateProvider;
+
+  static const Duration _autoSaveInterval = Duration(seconds: 5);
   static const int _defaultSlot = 0;
 
-  /// Initialize persistence and load game
+  /// Load the persisted save, or a fresh default if none exists.
   Future<GameSave> initialize() async {
     final loaded = await _dbHelper.loadGame(_defaultSlot);
-    _currentSave = loaded ?? GameSave.createDefault();
-    return _currentSave!;
+    return loaded ?? GameSave.createDefault();
   }
 
-  /// Get current save state
-  GameSave? get currentSave => _currentSave;
-
-  /// Start auto-save loop (call every 5 seconds)
-  void startAutoSave() {
-    _autoSaveTimer = Timer.periodic(
-      Duration(seconds: _autoSaveIntervalSeconds),
-      (_) => _autoSave(),
-    );
+  /// Start the auto-save loop. [stateProvider] returns the current game state
+  /// each time a save fires.
+  void startAutoSave(GameSave Function() stateProvider) {
+    _stateProvider = stateProvider;
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer.periodic(_autoSaveInterval, (_) => save());
   }
 
-  /// Stop auto-save loop
   void stopAutoSave() {
     _autoSaveTimer?.cancel();
+    _autoSaveTimer = null;
   }
 
-  /// Internal auto-save
-  Future<void> _autoSave() async {
-    if (_currentSave != null) {
-      await _dbHelper.saveGame(
-        _currentSave!.copyWith(lastSaveTime: DateTime.now()),
-        _defaultSlot,
-      );
-    }
-  }
-
-  /// Manual save
-  Future<void> manualSave(GameSave save) async {
-    _currentSave = save;
+  /// Persist the current state immediately. Safe to call at any time.
+  Future<void> save() async {
+    final provider = _stateProvider;
+    if (provider == null) return;
     await _dbHelper.saveGame(
-      save.copyWith(lastSaveTime: DateTime.now()),
+      provider().copyWith(lastSaveTime: DateTime.now()),
       _defaultSlot,
     );
   }
 
-  /// Cleanup
+  /// Flush a final save and release the database.
   Future<void> dispose() async {
     stopAutoSave();
-    await _autoSave(); // Final save
+    await save();
     await _dbHelper.close();
   }
 }

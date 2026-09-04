@@ -22,30 +22,8 @@ class IdleScreen extends StatefulWidget {
 }
 
 class _IdleScreenState extends State<IdleScreen> {
-  late EconomyManager economyManager;
-  late RunManager runManager;
-  late PersistenceService persistenceService;
-
-  @override
-  void initState() {
-    super.initState();
-    economyManager = widget.economyManager;
-    runManager = widget.runManager;
-    persistenceService = widget.persistenceService;
-    economyManager.addListener(_onStateChanged);
-  }
-
-  @override
-  void dispose() {
-    economyManager.removeListener(_onStateChanged);
-    super.dispose();
-  }
-
-  void _onStateChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
+  EconomyManager get economyManager => widget.economyManager;
+  RunManager get runManager => widget.runManager;
 
   void _startRun() {
     if (economyManager.heroes.isEmpty) {
@@ -55,7 +33,7 @@ class _IdleScreenState extends State<IdleScreen> {
       return;
     }
 
-    // Select first unlocked hero (or first hero)
+    // Select first unlocked hero (or first hero).
     final hero = economyManager.heroes.firstWhere(
       (h) => h.unlocked,
       orElse: () => economyManager.heroes.first,
@@ -77,26 +55,20 @@ class _IdleScreenState extends State<IdleScreen> {
     if (!mounted) return;
 
     final summary = runManager.getRunSummary();
-    final gold = summary['gold'] as double? ?? 0;
+    final gold = (summary['gold'] as num?)?.toDouble() ?? 0;
+    final victory = summary['victory'] as bool? ?? false;
 
-    // Add run rewards to gold
-    economyManager.onTap(); // Placeholder for adding gold
-    
-    // Actually apply the run rewards
-    final currentState = economyManager.state;
-    economyManager.loadState(
-      currentState.copyWith(
-        gold: currentState.gold + gold,
-        totalEarned: currentState.totalEarned + gold,
-        lastPlayTime: DateTime.now(),
-      ),
-    );
+    economyManager.addRunRewards(gold);
 
     Navigator.of(context).pop();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Run Complete! Earned ${gold.toStringAsFixed(0)} Gold'),
+        content: Text(
+          victory
+              ? 'Victory! Earned ${gold.toStringAsFixed(0)} Gold'
+              : 'Defeated. Earned ${gold.toStringAsFixed(0)} Gold',
+        ),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -104,10 +76,6 @@ class _IdleScreenState extends State<IdleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = economyManager.state;
-    final gold = state.gold.toStringAsFixed(0);
-    final incomePerSec = state.incomePerSecond.toStringAsFixed(2);
-
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a2e),
       appBar: AppBar(
@@ -118,33 +86,39 @@ class _IdleScreenState extends State<IdleScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Income display
+            // Income display — rebuilds only on economy changes.
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    'Gold: $gold',
-                    style: const TextStyle(
-                      color: Colors.yellow,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$$incomePerSec/sec',
-                    style: const TextStyle(
-                      color: Colors.greenAccent,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+              child: ListenableBuilder(
+                listenable: economyManager,
+                builder: (context, _) {
+                  final state = economyManager.state;
+                  return Column(
+                    children: [
+                      Text(
+                        'Gold: ${state.gold.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.yellow,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '\$${state.incomePerSecond.toStringAsFixed(2)}/sec',
+                        style: const TextStyle(
+                          color: Colors.greenAccent,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 20),
 
-            // Hero display (placeholder)
+            // Hero display (placeholder).
             Expanded(
               child: Center(
                 child: Container(
@@ -164,7 +138,7 @@ class _IdleScreenState extends State<IdleScreen> {
               ),
             ),
 
-            // Tap button
+            // Tap button.
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24.0),
               child: ElevatedButton(
@@ -190,7 +164,7 @@ class _IdleScreenState extends State<IdleScreen> {
               ),
             ),
 
-            // Action buttons
+            // Action buttons.
             Padding(
               padding: const EdgeInsets.only(bottom: 24.0),
               child: Row(

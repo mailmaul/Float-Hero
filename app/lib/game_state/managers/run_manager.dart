@@ -3,31 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../models/run_state.dart';
 import '../models/game_hero.dart';
 
-class RunManager {
+class RunManager extends ChangeNotifier {
   RunState? _runState;
-  final List<VoidCallback> _listeners = [];
   Timer? _combatTimer;
+
   static const double _heroAttackDamage = 5.0;
   static const Duration _combatTickDuration = Duration(milliseconds: 500);
+  static const int maxWaves = 5;
 
   RunState? get runState => _runState;
   bool get isRunActive => _runState?.isActive ?? false;
 
-  void addListener(VoidCallback listener) {
-    _listeners.add(listener);
-  }
-
-  void removeListener(VoidCallback listener) {
-    _listeners.remove(listener);
-  }
-
-  void _notifyListeners() {
-    for (final listener in _listeners) {
-      listener();
-    }
-  }
-
-  /// Start a new roguelike run
+  /// Start a new roguelike run.
   void startRun(GameHero hero) {
     final maxHealth = 50.0 + (hero.level * 5);
     _runState = RunState(
@@ -42,10 +29,10 @@ class RunManager {
       startTime: DateTime.now(),
     );
     _startCombatLoop();
-    _notifyListeners();
+    notifyListeners();
   }
 
-  /// Generate a wave of enemies
+  /// Generate a wave of enemies.
   List<Enemy> _generateWave(int waveNumber) {
     final enemyCount = 1 + (waveNumber ~/ 2);
     final baseHealth = 10.0 + (waveNumber * 5);
@@ -63,24 +50,21 @@ class RunManager {
     });
   }
 
-  /// Hero attacks the first alive enemy
+  /// Hero attacks the first alive enemy.
   void heroAttack() {
-    if (_runState == null || !isRunActive) return;
+    final run = _runState;
+    if (run == null || !run.isActive || run.enemies.isEmpty) return;
 
-    final run = _runState!;
-    if (run.enemies.isEmpty) return;
-
-    final targetIndex = 0;
-    final target = run.enemies[targetIndex];
-    final newHealth = (target.health - _heroAttackDamage).clamp(0.0, target.maxHealth).toDouble();
+    final target = run.enemies.first;
+    final newHealth =
+        (target.health - _heroAttackDamage).clamp(0.0, target.maxHealth).toDouble();
 
     final updatedEnemies = List<Enemy>.from(run.enemies);
-    updatedEnemies[targetIndex] = target.copyWith(health: newHealth);
+    updatedEnemies[0] = target.copyWith(health: newHealth);
 
-    // Remove dead enemies and collect loot
+    // Remove dead enemies and collect loot.
     var goldEarned = run.goldEarned;
     var xpEarned = run.xpEarned;
-
     updatedEnemies.removeWhere((enemy) {
       if (enemy.health <= 0) {
         goldEarned += enemy.goldReward;
@@ -90,75 +74,82 @@ class RunManager {
       return false;
     });
 
-    // Wave completed, spawn next wave
-    if (updatedEnemies.isEmpty && run.waveNumber < 5) {
-      updatedEnemies.addAll(_generateWave(run.waveNumber + 1));
+    var waveNumber = run.waveNumber;
+    if (updatedEnemies.isEmpty) {
+      if (waveNumber < maxWaves) {
+        // Advance to the next wave.
+        waveNumber += 1;
+        updatedEnemies.addAll(_generateWave(waveNumber));
+      } else {
+        // Final wave cleared: victory.
+        _runState = run.copyWith(
+          enemies: updatedEnemies,
+          goldEarned: goldEarned,
+          xpEarned: xpEarned,
+        );
+        endRun(victory: true);
+        return;
+      }
     }
 
     _runState = run.copyWith(
       enemies: updatedEnemies,
       goldEarned: goldEarned,
       xpEarned: xpEarned,
-      waveNumber: updatedEnemies.isEmpty ? run.waveNumber : run.waveNumber,
+      waveNumber: waveNumber,
     );
-
-    _notifyListeners();
+    notifyListeners();
   }
 
-  /// Start auto-attack loop (enemies attack hero)
+  /// Start auto-attack loop (enemies attack hero).
   void _startCombatLoop() {
     _combatTimer = Timer.periodic(_combatTickDuration, (_) {
-      if (_runState == null || !isRunActive) return;
+      final run = _runState;
+      if (run == null || !run.isActive || run.enemies.isEmpty) return;
 
-      final run = _runState!;
+      final totalDamage =
+          run.enemies.fold<double>(0, (sum, enemy) => sum + enemy.attackDamage);
+      final newHeroHealth =
+          (run.heroHealth - totalDamage).clamp(0.0, run.heroMaxHealth).toDouble();
 
-      // Enemies attack
-      if (run.enemies.isNotEmpty) {
-        final totalDamage = run.enemies
-            .fold<double>(0, (sum, enemy) => sum + enemy.attackDamage);
+      _runState = run.copyWith(heroHealth: newHeroHealth);
 
-        var newHeroHealth = (run.heroHealth - totalDamage).clamp(0.0, run.heroMaxHealth).toDouble();
-
-        _runState = run.copyWith(heroHealth: newHeroHealth);
-
-        // Check if hero is dead
-        if (newHeroHealth <= 0) {
-          endRun(victory: false);
-        } else {
-          _notifyListeners();
-        }
+      if (newHeroHealth <= 0) {
+        endRun(victory: false);
+      } else {
+        notifyListeners();
       }
     });
   }
 
-  /// End the run (victory or defeat)
+  /// End the run, recording whether the hero won.
   void endRun({required bool victory}) {
-    if (_runState == null) return;
+    final run = _runState;
+    if (run == null) return;
 
     _combatTimer?.cancel();
+    _combatTimer = null;
 
-    final run = _runState!;
-
-    _runState = run.copyWith(isActive: false);
-    _notifyListeners();
-
-    // Return to idle screen (handled by calling code)
+    _runState = run.copyWith(isActive: false, victory: victory);
+    notifyListeners();
   }
 
-  /// Get run summary for return to idle
+  /// Get run summary for return to idle.
   Map<String, dynamic> getRunSummary() {
-    if (_runState == null) return {};
-
+    final run = _runState;
+    if (run == null) return {};
     return {
-      'gold': _runState!.goldEarned,
-      'xp': _runState!.xpEarned,
-      'waves': _runState!.waveNumber,
-      'victory': _runState!.allEnemiesDead,
+      'gold': run.goldEarned,
+      'xp': run.xpEarned,
+      'waves': run.waveNumber,
+      'victory': run.victory,
     };
   }
 
+  @override
   void dispose() {
     _combatTimer?.cancel();
-    _listeners.clear();
+    _combatTimer = null;
+    super.dispose();
   }
 }

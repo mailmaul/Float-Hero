@@ -4,7 +4,7 @@ import 'game_state/managers/run_manager.dart';
 import 'game_state/services/persistence_service.dart';
 import 'ui/screens/idle_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const FloatHeroApp());
 }
@@ -35,12 +35,15 @@ class GameInitializer extends StatefulWidget {
   State<GameInitializer> createState() => _GameInitializerState();
 }
 
-class _GameInitializerState extends State<GameInitializer> {
-  late Future<GameManagers> _initFuture;
+class _GameInitializerState extends State<GameInitializer>
+    with WidgetsBindingObserver {
+  late final Future<GameManagers> _initFuture;
+  GameManagers? _managers;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initFuture = _initializeGame();
   }
 
@@ -48,27 +51,44 @@ class _GameInitializerState extends State<GameInitializer> {
     final persistenceService = PersistenceService();
     final save = await persistenceService.initialize();
 
-    // Apply offline earnings
-    final updatedSave = save.copyWith(
-      gold: save.gold + save.calculateOfflineEarnings(),
-      lastPlayTime: DateTime.now(),
-    );
-
-    // Initialize economy manager
-    final economyManager = EconomyManager(updatedSave);
+    final economyManager = EconomyManager(save);
+    economyManager.applyOfflineEarnings();
     economyManager.startIncomeLoop();
 
-    // Initialize run manager
     final runManager = RunManager();
 
-    // Start persistence
-    persistenceService.startAutoSave();
+    // Auto-save always writes the manager's live state.
+    persistenceService.startAutoSave(() => economyManager.state);
 
-    return GameManagers(
+    final managers = GameManagers(
       economyManager: economyManager,
       runManager: runManager,
       persistenceService: persistenceService,
     );
+    _managers = managers;
+    return managers;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      // Flush progress when the app leaves the foreground.
+      _managers?.persistenceService.save();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final managers = _managers;
+    if (managers != null) {
+      managers.economyManager.dispose();
+      managers.runManager.dispose();
+      managers.persistenceService.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -77,27 +97,23 @@ class _GameInitializerState extends State<GameInitializer> {
       future: _initFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: const Color(0xFF1a1a2e),
+          return const Scaffold(
+            backgroundColor: Color(0xFF1a1a2e),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: 60,
                     height: 60,
                     child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.cyan),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'Loading Float Hero...',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ],
               ),
@@ -107,14 +123,17 @@ class _GameInitializerState extends State<GameInitializer> {
 
         if (snapshot.hasError) {
           return Scaffold(
+            backgroundColor: const Color(0xFF1a1a2e),
             body: Center(
-              child: Text('Error: ${snapshot.error}'),
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           );
         }
 
         final managers = snapshot.data!;
-
         return IdleScreen(
           economyManager: managers.economyManager,
           runManager: managers.runManager,

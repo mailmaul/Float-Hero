@@ -3,8 +3,12 @@ class Upgrade {
   final String name;
   final String description;
   final int costPerLevel;
-  final double multiplier; // e.g., 1.15x income per level
+  final double multiplier; // e.g., 1.15x per level
   final int currentLevel;
+
+  /// When true the [multiplier] is applied to tap gold; otherwise to
+  /// passive income per second.
+  final bool affectsTap;
 
   Upgrade({
     required this.id,
@@ -13,6 +17,7 @@ class Upgrade {
     required this.costPerLevel,
     required this.multiplier,
     this.currentLevel = 0,
+    this.affectsTap = false,
   });
 
   int get nextCost => costPerLevel * (currentLevel + 1);
@@ -24,6 +29,7 @@ class Upgrade {
     int? costPerLevel,
     double? multiplier,
     int? currentLevel,
+    bool? affectsTap,
   }) {
     return Upgrade(
       id: id ?? this.id,
@@ -32,6 +38,7 @@ class Upgrade {
       costPerLevel: costPerLevel ?? this.costPerLevel,
       multiplier: multiplier ?? this.multiplier,
       currentLevel: currentLevel ?? this.currentLevel,
+      affectsTap: affectsTap ?? this.affectsTap,
     );
   }
 
@@ -43,6 +50,7 @@ class Upgrade {
       'costPerLevel': costPerLevel,
       'multiplier': multiplier,
       'currentLevel': currentLevel,
+      'affectsTap': affectsTap,
     };
   }
 
@@ -54,6 +62,7 @@ class Upgrade {
       costPerLevel: json['costPerLevel'] as int,
       multiplier: (json['multiplier'] as num).toDouble(),
       currentLevel: json['currentLevel'] as int? ?? 0,
+      affectsTap: json['affectsTap'] as bool? ?? false,
     );
   }
 }

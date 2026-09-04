@@ -44,6 +44,7 @@ class RunState {
   final double goldEarned;
   final int xpEarned;
   final DateTime startTime;
+  final bool victory;
 
   RunState({
     required this.isActive,
@@ -55,6 +56,7 @@ class RunState {
     required this.goldEarned,
     required this.xpEarned,
     required this.startTime,
+    this.victory = false,
   });
 
   bool get heroAlive => heroHealth > 0;
@@ -70,6 +72,7 @@ class RunState {
     double? goldEarned,
     int? xpEarned,
     DateTime? startTime,
+    bool? victory,
   }) {
     return RunState(
       isActive: isActive ?? this.isActive,
@@ -81,6 +84,7 @@ class RunState {
       goldEarned: goldEarned ?? this.goldEarned,
       xpEarned: xpEarned ?? this.xpEarned,
       startTime: startTime ?? this.startTime,
+      victory: victory ?? this.victory,
     );
   }
 }

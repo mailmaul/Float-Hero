@@ -3,7 +3,7 @@ import '../../game_state/managers/economy_manager.dart';
 import '../../game_state/models/game_hero.dart';
 import '../../game_state/models/upgrade.dart';
 
-class ShopScreen extends StatefulWidget {
+class ShopScreen extends StatelessWidget {
   final EconomyManager economyManager;
 
   const ShopScreen({
@@ -12,36 +12,7 @@ class ShopScreen extends StatefulWidget {
   });
 
   @override
-  State<ShopScreen> createState() => _ShopScreenState();
-}
-
-class _ShopScreenState extends State<ShopScreen> {
-  late EconomyManager economyManager;
-
-  @override
-  void initState() {
-    super.initState();
-    economyManager = widget.economyManager;
-    economyManager.addListener(_onStateChanged);
-  }
-
-  @override
-  void dispose() {
-    economyManager.removeListener(_onStateChanged);
-    super.dispose();
-  }
-
-  void _onStateChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final state = economyManager.state;
-    final gold = state.gold.toStringAsFixed(0);
-
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a2e),
       appBar: AppBar(
@@ -50,70 +21,69 @@ class _ShopScreenState extends State<ShopScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Gold display
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Gold: $gold',
-                style: const TextStyle(
-                  color: Colors.yellow,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+        child: ListenableBuilder(
+          listenable: economyManager,
+          builder: (context, _) {
+            final state = economyManager.state;
+            return Column(
+              children: [
+                // Gold display.
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Gold: ${state.gold.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: Colors.yellow,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // Shop tabs
-            Expanded(
-              child: DefaultTabController(
-                length: 2,
-                child: Column(
-                  children: [
-                    TabBar(
-                      tabs: const [
-                        Tab(text: 'HEROES'),
-                        Tab(text: 'UPGRADES'),
+                // Shop tabs.
+                Expanded(
+                  child: DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      children: [
+                        const TabBar(
+                          tabs: [
+                            Tab(text: 'HEROES'),
+                            Tab(text: 'UPGRADES'),
+                          ],
+                          labelColor: Colors.cyan,
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: Colors.cyan,
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              ListView.builder(
+                                itemCount: state.heroes.length,
+                                itemBuilder: (context, index) =>
+                                    _buildHeroCard(context, state.heroes[index]),
+                              ),
+                              ListView.builder(
+                                itemCount: state.upgrades.length,
+                                itemBuilder: (context, index) => _buildUpgradeCard(
+                                    context, state.upgrades[index]),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
-                      labelColor: Colors.cyan,
-                      unselectedLabelColor: Colors.grey,
-                      indicatorColor: Colors.cyan,
                     ),
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          // Heroes tab
-                          ListView.builder(
-                            itemCount: state.heroes.length,
-                            itemBuilder: (context, index) {
-                              final hero = state.heroes[index];
-                              return _buildHeroCard(hero);
-                            },
-                          ),
-
-                          // Upgrades tab
-                          ListView.builder(
-                            itemCount: state.upgrades.length,
-                            itemBuilder: (context, index) {
-                              final upgrade = state.upgrades[index];
-                              return _buildUpgradeCard(upgrade);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeroCard(GameHero hero) {
+  Widget _buildHeroCard(BuildContext context, GameHero hero) {
     final isAffordable = economyManager.gold >= hero.cost;
     final isUnlocked = hero.unlocked;
 
@@ -188,8 +158,7 @@ class _ShopScreenState extends State<ShopScreen> {
                             economyManager.purchaseHero(hero.id);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content:
-                                    Text('Purchased ${hero.name}!'),
+                                content: Text('Purchased ${hero.name}!'),
                                 duration: const Duration(milliseconds: 500),
                               ),
                             );
@@ -208,7 +177,7 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  Widget _buildUpgradeCard(Upgrade upgrade) {
+  Widget _buildUpgradeCard(BuildContext context, Upgrade upgrade) {
     final isAffordable = economyManager.gold >= upgrade.nextCost;
 
     return Card(
